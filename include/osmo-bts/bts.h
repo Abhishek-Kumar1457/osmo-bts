@@ -66,6 +66,10 @@ enum bts_impl_flag {
 	BTS_INTERNAL_FLAG_NM_RCHANNEL_DEPENDS_RCARRIER,
 	/* Whether the BTS model reports interference measurements to L1SAP. */
 	BTS_INTERNAL_FLAG_INTERF_MEAS,
+	/* Whether the BTS model uses HR GSM RTP payload in RFC 5993 format */
+	BTS_INTERNAL_FLAG_SPEECH_H_V1_RTP_RFC5993,
+	/* Whether the BTS model uses HR GSM RTP payload in ETSI TS 101.318 (TIPHON) format */
+	BTS_INTERNAL_FLAG_SPEECH_H_V1_RTP_TS101318,
 
 	_BTS_INTERNAL_FLAG_NUM, /* must be at the end */
 };

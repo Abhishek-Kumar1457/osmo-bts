@@ -204,6 +204,8 @@ const struct value_string bts_impl_flag_desc[] = {
 	{ BTS_INTERNAL_FLAG_MEAS_PAYLOAD_COMB,	"Measurement and Payload data combined" },
 	{ BTS_INTERNAL_FLAG_NM_RCHANNEL_DEPENDS_RCARRIER, "OML RadioChannel MO depends on RadioCarrier MO" },
 	{ BTS_INTERNAL_FLAG_INTERF_MEAS,	"Uplink interference measurements" },
+	{ BTS_INTERNAL_FLAG_SPEECH_H_V1_RTP_RFC5993, "HR GSM RTP payload in RFC 5993 format is supported"},
+	{ BTS_INTERNAL_FLAG_SPEECH_H_V1_RTP_TS101318, "HR GSM RTP payload in ETSI TS 101.318 format is supported"},
 	{ 0, NULL }
 };
 

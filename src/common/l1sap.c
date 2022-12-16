@@ -1940,6 +1940,43 @@ int l1sap_pdch_req(struct gsm_bts_trx_ts *ts, int is_ptcch, uint32_t fn,
 	return l1sap_down(ts->trx, l1sap);
 }
 
+/* There are two different specifications that describe how HR GSM audio should be encapsulated in RTP frames:
+ * RFC 5993 and ETSI TS 101.318 (TIPHON). In order to be able to accept both formats we convert them on
+ * reception depending on what the particular BTS model supports. In case the BTS flags indicate that both
+ * formats are supported (either by setting both or none of the flags), no conversion will be carried out.
+ * The only difference between TS 101.318 and RFC 5993 is that RFC 5993 specifies an additional one byte TOC
+ * header in front of the audio payload. (See also: RFC 5993, section 5.2) */
+static struct msgb *rtppayload_convert_hr(const uint8_t *rtp_pl, uint8_t rtp_pl_len, struct gsm_lchan *lchan)
+{
+	bool rfc5993 = bts_internal_flag_get(lchan->ts->trx->bts, BTS_INTERNAL_FLAG_SPEECH_H_V1_RTP_RFC5993);
+	bool ts101318 =	bts_internal_flag_get(lchan->ts->trx->bts, BTS_INTERNAL_FLAG_SPEECH_H_V1_RTP_TS101318);
+	struct msgb *msg;
+
+	msg = l1sap_msgb_alloc(rtp_pl_len);
+	if (!msg)
+		return NULL;
+	memcpy(msgb_put(msg, rtp_pl_len), rtp_pl, rtp_pl_len);
+
+	/* Since we already verified the payload in rtppayload_validate_hr(), we may trust that the payload length is
+	 * correct according to either RFC 5993 or TS 101 318. */
+	switch (rtp_pl_len) {
+	case GSM_HR_BYTES_RTP_TS101318:
+		/* Convert from TS 101 318 to RFC 5993 */
+		if (OSMO_UNLIKELY(!ts101318 && rfc5993))
+			msgb_push_u8(msg, 0x00);
+		break;
+	case GSM_HR_BYTES_RTP_RFC5993:
+		/* Convert from RFC 5993 TS 101 318 */
+		if (OSMO_UNLIKELY(!rfc5993 && ts101318))
+			msgb_pull_u8(msg);
+		break;
+	default:
+		OSMO_ASSERT(0);
+	}
+
+	return msg;
+}
+
 /*! \brief call-back function for incoming RTP */
 void l1sap_rtp_rx_cb(struct osmo_rtp_socket *rs, const uint8_t *rtp_pl,
                      unsigned int rtp_pl_len, uint16_t seq_number,
@@ -1953,10 +1990,22 @@ void l1sap_rtp_rx_cb(struct osmo_rtp_socket *rs, const uint8_t *rtp_pl,
 	if (lchan->loopback)
 		return;
 
-	msg = l1sap_msgb_alloc(rtp_pl_len);
-	if (!msg)
-		return;
-	memcpy(msgb_put(msg, rtp_pl_len), rtp_pl, rtp_pl_len);
+	switch (lchan->tch_mode) {
+	case GSM48_CMODE_SPEECH_V1:
+		if (lchan->type == GSM_LCHAN_TCH_H) {
+			msg = rtppayload_convert_hr(rtp_pl, rtp_pl_len, lchan);
+			if (!msg)
+				return;
+			break;
+		}
+		/* fallthrough, no conversion required */
+	default:
+		msg = l1sap_msgb_alloc(rtp_pl_len);
+		if (!msg)
+			return;
+		memcpy(msgb_put(msg, rtp_pl_len), rtp_pl, rtp_pl_len);
+	}
+
 	msgb_pull(msg, sizeof(struct osmo_phsap_prim));
 
 	/* Store RTP header Marker bit in control buffer */

@@ -157,6 +157,7 @@ int bts_model_init(struct gsm_bts *bts)
 
 	bts_internal_flag_set(bts, BTS_INTERNAL_FLAG_MEAS_PAYLOAD_COMB);
 	bts_internal_flag_set(bts, BTS_INTERNAL_FLAG_INTERF_MEAS);
+	bts_internal_flag_set(bts, BTS_INTERNAL_FLAG_SPEECH_H_V1_RTP_RFC5993);
 
 	return 0;
 }

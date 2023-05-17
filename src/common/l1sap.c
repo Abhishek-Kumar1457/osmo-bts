@@ -1252,6 +1252,16 @@ static bool rtppayload_validate_fr(struct msgb *msg)
 	return osmo_fr_sid_preen(msg->data);
 }
 
+static bool rtppayload_validate_hr(struct msgb *msg)
+{
+	/* Make sure the length of the payload matches one of the possible formats,
+	 * which are ETSI TS 101.318 and RFC 5993 */
+	if (OSMO_UNLIKELY((msg->len != GSM_HR_BYTES_RTP_TS101318)
+			  && (msg->len != GSM_HR_BYTES_RTP_RFC5993)))
+		return false;
+	return true;
+}
+
 static bool rtppayload_validate_efr(struct msgb *msg)
 {
 	if (msg->len != GSM_EFR_BYTES)
@@ -1280,7 +1290,7 @@ static bool rtppayload_is_valid(struct gsm_lchan *lchan, struct msgb *resp_msg)
 		if (lchan->type == GSM_LCHAN_TCH_F)
 			return rtppayload_validate_fr(resp_msg);
 		else
-			return true;	/* FIXME: implement preening for HR1 */
+			return rtppayload_validate_hr(resp_msg);
 	case GSM48_CMODE_SPEECH_EFR:
 		return rtppayload_validate_efr(resp_msg);
 	case GSM48_CMODE_SPEECH_AMR:

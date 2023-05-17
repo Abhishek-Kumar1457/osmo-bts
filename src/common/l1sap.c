@@ -1216,7 +1216,7 @@ static int l1sap_ph_rts_ind(struct gsm_bts_trx *trx,
 	return 1;
 }
 
-static bool rtppayload_is_octet_aligned(const uint8_t *rtp_pl, uint8_t payload_len)
+static bool rtppayload_is_octet_aligned(const uint8_t *rtp_pl, uint8_t rtp_pl_len)
 {
 	/*
 	 * Logic: If 1st bit padding is not zero, packet is either:
@@ -1237,7 +1237,7 @@ static bool rtppayload_is_octet_aligned(const uint8_t *rtp_pl, uint8_t payload_l
 	#define AMR_PADDING1(rtp_pl) (rtp_pl[0] & 0x0f)
 	#define AMR_PADDING2(rtp_pl) (rtp_pl[1] & 0x03)
 
-	if (payload_len < 2 || AMR_PADDING1(rtp_pl) || AMR_PADDING2(rtp_pl))
+	if (rtp_pl_len < 2 || AMR_PADDING1(rtp_pl) || AMR_PADDING2(rtp_pl))
 		return false;
 
 	return true;

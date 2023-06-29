@@ -1813,20 +1813,63 @@ static void send_rtp_rfc5993(struct gsm_lchan *lchan, uint32_t fn,
 	send_ul_rtp_packet(lchan, fn, msg->data, msg->len);
 }
 
+/* a helper function for emitting FR/EFR UL in TW-TS-001 format */
+static void send_rtp_twts001(struct gsm_lchan *lchan, uint32_t fn,
+			     struct msgb *msg, bool good_frame)
+{
+	uint8_t teh;
+	bool send_frame;
+
+	if (msg->len == GSM_FR_BYTES || msg->len == GSM_EFR_BYTES) {
+		if (good_frame)
+			teh = 0xE0;
+		else
+			teh = 0xE2;
+		send_frame = true;
+	} else {
+		teh = 0xE6;
+		send_frame = false;
+	}
+	/* always set DTXd and TAF bits */
+	if (lchan->ts->trx->bts->dtxd)
+		teh |= 0x08;
+	if (fn % 104 == 52)
+		teh |= 0x01;
+	if (send_frame) {
+		msgb_push_u8(msg, teh);
+		send_ul_rtp_packet(lchan, fn, msg->data, msg->len);
+	} else {
+		send_ul_rtp_packet(lchan, fn, &teh, 1);
+	}
+}
+
 /* A helper function for l1sap_tch_ind(): handling BFI
  *
- * Please note that we pass the msgb to this function, even though it is
- * currently not used.  This msgb passing is a provision for adding
- * support for TRAU-UL-like RTP payload formats like TW-TS-001 that allow
- * indicating BFI along with deemed-bad frame data bits, just like
+ * Please note that the msgb passed to this function is used only when
+ * the BTS is configured to emit FR & EFR UL in TW-TS-001 format,
+ * indicating BFI along with deemed-bad frame data bits just like
  * GSM 08.60 and 08.61 TRAU-UL frames.
  */
 static void tch_ul_bfi_handler(struct gsm_lchan *lchan,
 			       const struct gsm_time *g_time, struct msgb *msg)
 {
+	struct gsm_bts *bts = lchan->ts->trx->bts;
 	uint32_t fn = g_time->fn;
 	uint8_t ecu_out[GSM_FR_BYTES];
 	int rc;
+
+	/* Are we on TCH/FS or TCH/EFS, configured to emit TW-TS-001 extended
+	 * RTP format?  If so, emit BFI per that spec.  The placement of
+	 * this check before the ECU is intentional: the modes of TW-TS-001
+	 * UL output (closely replicating the classic GSM architecture in which
+	 * a BTS never applies an ECU to its UL output) and internal UL ECU
+	 * are mutually exclusive. */
+	if (bts->emit_fr_twts001 && lchan->type == GSM_LCHAN_TCH_F &&
+	    (lchan->tch_mode == GSM48_CMODE_SPEECH_V1 ||
+	     lchan->tch_mode == GSM48_CMODE_SPEECH_EFR)) {
+		send_rtp_twts001(lchan, fn, msg, false);
+		return;
+	}
 
 	/* Are we applying an ECU to this uplink, and are we in a state
 	 * (not DTX pause) where we emit ECU output? */
@@ -1842,7 +1885,7 @@ static void tch_ul_bfi_handler(struct gsm_lchan *lchan,
 
 	/* Are we in rtp continuous-streaming special mode? If so, send out
 	 * a BFI packet as zero-length RTP payload. */
-	if (lchan->ts->trx->bts->rtp_nogaps_mode) {
+	if (bts->rtp_nogaps_mode) {
 		send_ul_rtp_packet(lchan, fn, NULL, 0);
 		return;
 	}
@@ -1903,6 +1946,11 @@ static int l1sap_tch_ind(struct gsm_bts_trx *trx, struct osmo_phsap_prim *l1sap,
 		if (bts->emit_hr_rfc5993 && lchan->type == GSM_LCHAN_TCH_H &&
 		    lchan->tch_mode == GSM48_CMODE_SPEECH_V1)
 			send_rtp_rfc5993(lchan, fn, msg);
+		else if (bts->emit_fr_twts001 &&
+			 lchan->type == GSM_LCHAN_TCH_F &&
+			 (lchan->tch_mode == GSM48_CMODE_SPEECH_V1 ||
+			  lchan->tch_mode == GSM48_CMODE_SPEECH_EFR))
+			send_rtp_twts001(lchan, fn, msg, true);
 		else
 			send_ul_rtp_packet(lchan, fn, msg->data, msg->len);
 		/* if loopback is enabled, also queue received RTP data */

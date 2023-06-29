@@ -420,6 +420,8 @@ static void config_write_bts_single(struct vty *vty, const struct gsm_bts *bts)
 		vty_out(vty, " rtp continuous-streaming%s", VTY_NEWLINE);
 	vty_out(vty, " %srtp internal-uplink-ecu%s",
 		bts->use_ul_ecu ? "" : "no ", VTY_NEWLINE);
+	vty_out(vty, " rtp fr-efr-format %s%s",
+		bts->emit_fr_twts001 ? "tw-ts-001" : "ts101318", VTY_NEWLINE);
 	vty_out(vty, " rtp hr-format %s%s",
 		bts->emit_hr_rfc5993 ? "rfc5993" : "ts101318", VTY_NEWLINE);
 	vty_out(vty, " paging queue-size %u%s", paging_get_queue_max(bts->paging_state),
@@ -820,6 +822,19 @@ DEFUN(cfg_bts_no_rtp_int_ul_ecu,
 	struct gsm_bts *bts = vty->index;
 
 	bts->use_ul_ecu = false;
+	return CMD_SUCCESS;
+}
+
+DEFUN_ATTR(cfg_bts_rtp_fr_format,
+	   cfg_bts_rtp_fr_format_cmd,
+	   "rtp fr-efr-format (ts101318|tw-ts-001)",
+	   RTP_STR "FR & EFR output format\n"
+	   "TS 101 318 (standard)\n" "TW-TS-001 (non-standard)\n",
+	   CMD_ATTR_IMMEDIATE)
+{
+	struct gsm_bts *bts = vty->index;
+
+	bts->emit_fr_twts001 = !strcmp(argv[0], "tw-ts-001");
 	return CMD_SUCCESS;
 }
 
@@ -2726,6 +2741,7 @@ int bts_vty_init(void *ctx)
 	install_element(BTS_NODE, &cfg_bts_no_rtp_cont_stream_cmd);
 	install_element(BTS_NODE, &cfg_bts_rtp_int_ul_ecu_cmd);
 	install_element(BTS_NODE, &cfg_bts_no_rtp_int_ul_ecu_cmd);
+	install_element(BTS_NODE, &cfg_bts_rtp_fr_format_cmd);
 	install_element(BTS_NODE, &cfg_bts_rtp_hr_format_cmd);
 	install_element(BTS_NODE, &cfg_bts_band_cmd);
 	install_element(BTS_NODE, &cfg_description_cmd);
